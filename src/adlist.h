@@ -40,17 +40,17 @@ typedef struct listNode {
 } listNode;
 
 typedef struct listIter {
-    listNode *next;
-    int direction;
+    listNode *next; //迭代器当前指向的节点（名字叫next有点迷惑）
+    int direction; //迭代方向，可以取以下两个值：AL_START_HEAD和AL_START_TAIL
 } listIter;
 
 typedef struct list {
-    listNode *head;
-    listNode *tail;
-    void *(*dup)(void *ptr);
-    void (*free)(void *ptr);
-    int (*match)(void *ptr, void *key);
-    unsigned long len;
+    listNode *head; //链表头结点指针
+    listNode *tail; //链表尾结点指针
+    void *(*dup)(void *ptr); //复制链表节点保存的值
+    void (*free)(void *ptr); //释放链表节点保存的值
+    int (*match)(void *ptr, void *key); //比较链表节点所保存的节点值和另一个输入的值是否相等
+    unsigned long len; //链表长度计数器
 } list;
 
 /* Functions implemented as macros */
@@ -90,7 +90,7 @@ void listRotateHeadToTail(list *list);
 void listJoin(list *l, list *o);
 
 /* Directions for iterators */
-#define AL_START_HEAD 0
-#define AL_START_TAIL 1
+#define AL_START_HEAD 0  //正向迭代：从表头向表尾进行迭代
+#define AL_START_TAIL 1  //反向迭代：从表尾到表头进行迭代
 
 #endif /* __ADLIST_H__ */

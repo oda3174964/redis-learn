@@ -45,14 +45,14 @@
 #define DICT_NOTUSED(V) ((void) V)
 
 typedef struct dictEntry {
-    void *key;
+    void *key; //key
     union {
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
     } v;
-    struct dictEntry *next;
+    struct dictEntry *next; //指向下一个hash节点，用来解决hash键冲突（collision）
 } dictEntry;
 
 typedef struct dictType {
@@ -66,18 +66,20 @@ typedef struct dictType {
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
-typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+typedef struct dictht { //哈希表
+    dictEntry **table; //存放一个数组的地址，数组存放着哈希表节点dictEntry的地址。
+    unsigned long size; //哈希表table的大小，初始化大小为4
+    unsigned long sizemask; //用于将哈希值映射到table的位置索引。它的值总是等于(size-1)
+    unsigned long used; //记录哈希表已有的节点（键值对）数量
 } dictht;
 
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
+    dictType *type; //指向dictType结构，dictType结构中包含自定义的函数，这些函数使得key和value能够存储任何类型的数据
+    void *privdata; //私有数据，保存着dictType结构中函数的参数
+    dictht ht[2]; //两张哈希表
+    //rehash的标记，rehashidx==-1，表示没在进行rehash
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */
+    //正在迭代的迭代器数量
     unsigned long iterators; /* number of iterators currently running */
 } dict;
 
@@ -86,15 +88,15 @@ typedef struct dict {
  * iterating. Otherwise it is a non safe iterator, and only dictNext()
  * should be called while iterating. */
 typedef struct dictIterator {
-    dict *d;
-    long index;
-    int table, safe;
-    dictEntry *entry, *nextEntry;
+    dict *d; //被迭代的字典
+    long index; //迭代器当前所指向的哈希表索引位置
+    int table, safe; //table表示正迭代的哈希表号码，ht[0]或ht[1]。safe表示这个迭代器是否安全
+    dictEntry *entry, *nextEntry; //entry指向当前迭代的哈希表节点，nextEntry则指向当前节点的下一个节点
     /* unsafe iterator fingerprint for misuse detection. */
-    long long fingerprint;
+    long long fingerprint; //避免不安全迭代器的指纹标记
 } dictIterator;
 
-typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
+typedef void (dictScanFunction)(void *privdata, const dictEntry *de); //字典扫描方法
 typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 
 /* This is the initial size of every hash table */
