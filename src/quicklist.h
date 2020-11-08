@@ -44,15 +44,19 @@
  * attempted_compress: 1 bit, boolean, used for verifying during testing.
  * extra: 10 bits, free for future use; pads out the remainder of 32 bits */
 typedef struct quicklistNode {
-    struct quicklistNode *prev;
-    struct quicklistNode *next;
-    unsigned char *zl;
-    unsigned int sz;             /* ziplist size in bytes */
-    unsigned int count : 16;     /* count of items in ziplist */
-    unsigned int encoding : 2;   /* RAW==1 or LZF==2 */
+    struct quicklistNode *prev;//前驱节点指针
+    struct quicklistNode *next;//后继节点指针
+    unsigned char *zl;//不设置压缩数据参数时指向一个ziplist结构，设置压缩数据参数指向quicklistLZF结构
+    unsigned int sz;             /* ziplist size in bytes *///压缩列表ziplist的总长度
+    unsigned int count : 16;     /* count of items in ziplist *///ziplist中包的节点数，占16 bits长度
+    unsigned int encoding : 2;   /* RAW==1 or LZF==2 *///表示是否采用LZF压缩算法压缩quicklist节点，1表示不采用，2表示采用，占2 bits长度
+    //表示一个quicklistNode节点是否采用ziplist结构保存数据，2表示采用，1表示不采用，默认是2，占2bits长度
     unsigned int container : 2;  /* NONE==1 or ZIPLIST==2 */
+    //标记quicklist是否压缩过，占1bit长度
+    //如果recompress为1，则等待被再次压缩
     unsigned int recompress : 1; /* was this node previous compressed? */
     unsigned int attempted_compress : 1; /* node can't compress; too small */
+    //额外扩展位，占10bits长度
     unsigned int extra : 10; /* more bits to steal for future usage */
 } quicklistNode;
 
@@ -62,7 +66,9 @@ typedef struct quicklistNode {
  * NOTE: uncompressed length is stored in quicklistNode->sz.
  * When quicklistNode->zl is compressed, node->zl points to a quicklistLZF */
 typedef struct quicklistLZF {
+    //表示被LZF算法压缩后的ziplist的大小
     unsigned int sz; /* LZF size in bytes*/
+    //保存压缩后的ziplist的数组，柔性数组
     char compressed[];
 } quicklistLZF;
 
@@ -103,42 +109,54 @@ typedef struct quicklistBookmark {
  * 'bookmakrs are an optional feature that is used by realloc this struct,
  *      so that they don't consume memory when not used. */
 typedef struct quicklist {
-    quicklistNode *head;
+    quicklistNode *head; //指向头部(最左边)quicklist节点的指针
+    //指向尾部(最右边)quicklist节点的指针
     quicklistNode *tail;
+    //ziplist节点计数器
     unsigned long count;        /* total count of all entries in all ziplists */
+    //quicklist节点计数器
     unsigned long len;          /* number of quicklistNodes */
+    //保存ziplist的大小，配置文件设定，占16bits
     int fill : QL_FILL_BITS;              /* fill factor for individual nodes */
+    //保存压缩程度，配置文件设定，占16bits，0表示不压缩
     unsigned int compress : QL_COMP_BITS; /* depth of end nodes not to compress;0=off */
     unsigned int bookmark_count: QL_BM_BITS;
     quicklistBookmark bookmarks[];
 } quicklist;
 
 typedef struct quicklistIter {
+    //指向所属的quicklist的指针
     const quicklist *quicklist;
+    //指向当前迭代的quicklist节点的指针
     quicklistNode *current;
+    //指向当前quicklist节点中迭代的ziplist
     unsigned char *zi;
+    //当前ziplist结构中的偏移量
     long offset; /* offset in current ziplist */
+    //迭代方向
     int direction;
 } quicklistIter;
 
+//管理quicklist中quicklistNode节点中ziplist信息的结构
 typedef struct quicklistEntry {
-    const quicklist *quicklist;
-    quicklistNode *node;
-    unsigned char *zi;
-    unsigned char *value;
-    long long longval;
-    unsigned int sz;
-    int offset;
+    const quicklist *quicklist;//指向所属的quicklist的指针
+    quicklistNode *node;//指向所属的quicklistNode节点的指针
+    unsigned char *zi;//指向当前ziplist结构的指针
+    unsigned char *value;//指向当前ziplist结构的字符串vlaue成员
+    long long longval;//指向当前ziplist结构的整数value成员
+    unsigned int sz;//保存当前ziplist结构的字节数大小
+    int offset;//保存相对ziplist的偏移量
 } quicklistEntry;
 
-#define QUICKLIST_HEAD 0
-#define QUICKLIST_TAIL -1
+#define QUICKLIST_HEAD 0 //没有被压缩
+#define QUICKLIST_TAIL -1 //被LZF算法压缩
 
 /* quicklist node encodings */
-#define QUICKLIST_NODE_ENCODING_RAW 1
-#define QUICKLIST_NODE_ENCODING_LZF 2
+#define QUICKLIST_NODE_ENCODING_RAW 1 //quicklist节点直接保存对象
+#define QUICKLIST_NODE_ENCODING_LZF 2 //quicklist节点采用ziplist保存对象
 
 /* quicklist compression disable */
+//测试quicklist节点是否被压缩，返回1 表示被压缩，否则返回0
 #define QUICKLIST_NOCOMPRESS 0
 
 /* quicklist container formats */
