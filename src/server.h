@@ -464,10 +464,15 @@ extern int configOOMScoreAdjValuesDefaults[CONFIG_OOM_COUNT];
 /* A redis object, that is a type able to hold a string / list / set */
 
 /* The actual Redis Object */
+//字符串对象
 #define OBJ_STRING 0    /* String object. */
+//列表对象
 #define OBJ_LIST 1      /* List object. */
+//集合对象
 #define OBJ_SET 2       /* Set object. */
+//有序集合对象
 #define OBJ_ZSET 3      /* Sorted set object. */
+//哈希对象
 #define OBJ_HASH 4      /* Hash object. */
 
 /* The "module" object type is a special one that signals that the object
@@ -600,16 +605,26 @@ typedef struct RedisModuleDigest {
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+//原始表示方式，字符串对象是简单动态字符串
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
+//long类型的整数
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
+//字典
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
 #define OBJ_ENCODING_ZIPMAP 3  /* Encoded as zipmap */
+//双端链表
 #define OBJ_ENCODING_LINKEDLIST 4 /* No longer used: old list encoding. */
+//压缩列表
 #define OBJ_ENCODING_ZIPLIST 5 /* Encoded as ziplist */
+//整数集合
 #define OBJ_ENCODING_INTSET 6  /* Encoded as intset */
+//跳跃表和字典
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
+//embstr编码的简单动态字符串
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
+//由压缩列表组成的双向列表-->快速列表
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
+// 字典树
 #define OBJ_ENCODING_STREAM 10 /* Encoded as a radix tree of listpacks */
 
 #define LRU_BITS 24
@@ -619,13 +634,17 @@ typedef struct RedisModuleDigest {
 #define OBJ_SHARED_REFCOUNT INT_MAX     /* Global object never destroyed. */
 #define OBJ_STATIC_REFCOUNT (INT_MAX-1) /* Object allocated in the stack. */
 #define OBJ_FIRST_SPECIAL_REFCOUNT OBJ_STATIC_REFCOUNT
+
 typedef struct redisObject {
-    unsigned type:4;
-    unsigned encoding:4;
+    unsigned type:4; //对象的数据类型，占4bits，共5种类型
+    unsigned encoding:4; //对象的编码类型，占4bits，共10种类型
+    //实用LRU算法计算相对server.lruclock的LRU时间
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
                             * LFU data (least significant 8 bits frequency
                             * and most significant 16 bits access time). */
+    //引用计数
     int refcount;
+    //指向底层数据实现的指针
     void *ptr;
 } robj;
 

@@ -281,7 +281,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
-// 确保sds的没有可用的空间，长度都用来存放字符串，avail字段为0
+// 确保sds没有可用的空间，长度都用来存放字符串，avail字段为0
 sds sdsRemoveFreeSpace(sds s) {
     void *sh, *newsh;
     char type, oldtype = s[-1] & SDS_TYPE_MASK;
