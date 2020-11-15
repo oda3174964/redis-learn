@@ -563,20 +563,21 @@ int d2string(char *buf, size_t len, double value) {
 int ld2string(char *buf, size_t len, long double value, ld2string_mode mode) {
     size_t l = 0;
 
-    if (isinf(value)) {
+    if (isinf(value)) { //value是否为正无穷，返回1表示正无穷，返回-1表示负无穷
         /* Libc in odd systems (Hi Solaris!) will format infinite in a
          * different way, so better to handle it in an explicit way. */
         if (len < 5) return 0; /* No room. 5 is "-inf\0" */
         if (value > 0) {
-            memcpy(buf,"inf",3);
+            memcpy(buf,"inf",3); //正无穷
             l = 3;
         } else {
-            memcpy(buf,"-inf",4);
+            memcpy(buf,"-inf",4); //负无穷
             l = 4;
         }
     } else {
         switch (mode) {
         case LD_STR_AUTO:
+            //以17位精度浮点数将value写入buf中
             l = snprintf(buf,len,"%.17Lg",value);
             if (l+1 > len) return 0; /* No room. */
             break;
@@ -593,13 +594,14 @@ int ld2string(char *buf, size_t len, long double value, ld2string_mode mode) {
             l = snprintf(buf,len,"%.17Lf",value);
             if (l+1 > len) return 0; /* No room. */
             /* Now remove trailing zeroes after the '.' */
-            if (strchr(buf,'.') != NULL) {
-                char *p = buf+l-1;
-                while(*p == '0') {
+            //去除小数点尾部没有用的零
+            if (strchr(buf,'.') != NULL) {//如果在buf中能找到'.'
+                char *p = buf+l-1; //定位到buf的最后一个字符的地址
+                while(*p == '0') { //如果是'0'，则将p向前指向一个字符，且将buf的len减1
                     p--;
                     l--;
                 }
-                if (*p == '.') l--;
+                if (*p == '.') l--;  //例如：3.0000 变成 3
             }
             if (l == 2 && buf[0] == '-' && buf[1] == '0') {
                 buf[0] = '0';

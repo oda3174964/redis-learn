@@ -54,7 +54,7 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-typedef long long mstime_t; /* millisecond time type. */
+typedef long long mstime_t; /* millisecond time type. */ /* 毫秒时间类型millisecond time type. */
 typedef long long ustime_t; /* microsecond time type. */
 
 #include "ae.h"      /* Event driven programming library */
@@ -97,13 +97,13 @@ typedef long long ustime_t; /* microsecond time type. */
 #define NET_MAX_WRITES_PER_EVENT (1024*64)
 #define PROTO_SHARED_SELECT_CMDS 10
 #define OBJ_SHARED_INTEGERS 10000
-#define OBJ_SHARED_BULKHDR_LEN 32
+#define OBJ_SHARED_BULKHDR_LEN 32 //共享的回复长度
 #define LOG_MAX_LEN    1024 /* Default maximum length of syslog messages.*/
 #define AOF_REWRITE_ITEMS_PER_CMD 64
 #define AOF_READ_DIFF_INTERVAL_BYTES (1024*10)
 #define CONFIG_AUTHPASS_MAX_LEN 512
 #define CONFIG_RUN_ID_SIZE 40
-#define RDB_EOF_MARK_SIZE 40
+#define RDB_EOF_MARK_SIZE 40 //rdb文件EOF的长度
 #define CONFIG_REPL_BACKLOG_MIN_SIZE (1024*16)          /* 16k */
 #define CONFIG_BGSAVE_RETRY_DELAY 5 /* Wait a few secs before trying again. */
 #define CONFIG_DEFAULT_PID_FILE "/var/run/redis.pid"
@@ -213,17 +213,27 @@ extern int configOOMScoreAdjValuesDefaults[CONFIG_OOM_COUNT];
 #define AOF_WAIT_REWRITE 2    /* AOF waits rewrite to start appending */
 
 /* Client flags */
+// client是从节点服务器
 #define CLIENT_SLAVE (1<<0)   /* This client is a repliaca */
+// client是主节点服务器
 #define CLIENT_MASTER (1<<1)  /* This client is a master */
+// client是一个从节点监控器
 #define CLIENT_MONITOR (1<<2) /* This client is a slave monitor, see MONITOR */
+// client处于事务环境中
 #define CLIENT_MULTI (1<<3)   /* This client is in a MULTI context */
 #define CLIENT_BLOCKED (1<<4) /* The client is waiting in a blocking operation */
+// 监视的键被修改，EXEC执行失败
 #define CLIENT_DIRTY_CAS (1<<5) /* Watched keys modified. EXEC will fail. */
+// 发送回复后要关闭client，当执行client kill命令等
 #define CLIENT_CLOSE_AFTER_REPLY (1<<6) /* Close after writing entire reply. */
-#define CLIENT_UNBLOCKED (1<<7) /* This client was unblocked and is stored in
-                                  server.unblocked_clients */
+// 不被阻塞的client，保存在unblocked_clients中
+#define CLIENT_UNBLOCKED (1<<7) /* This client was unblocked and is stored in*/
+                                //  server.unblocked_clients */
+// 表示该客户端是一个专门处理lua脚本的伪客户端
 #define CLIENT_LUA (1<<8) /* This is a non connected client used by Lua */
+// 发送了ASKING命令
 #define CLIENT_ASKING (1<<9)     /* Client issued the ASKING command */
+// 正要关闭的client
 #define CLIENT_CLOSE_ASAP (1<<10)/* Close this client ASAP */
 #define CLIENT_UNIX_SOCKET (1<<11) /* Client connected via Unix domain socket */
 #define CLIENT_DIRTY_EXEC (1<<12)  /* EXEC will fail for errors while queueing */
