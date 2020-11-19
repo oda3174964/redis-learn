@@ -739,47 +739,68 @@ void lposCommand(client *c) {
     }
 }
 
+// LREM命令
 void lremCommand(client *c) {
     robj *subject, *obj;
     obj = c->argv[3];
     long toremove;
     long removed = 0;
 
+    //将字符串类型的count参数转换为long类型的整数，保存在toremove中
     if ((getLongFromObjectOrReply(c, c->argv[2], &toremove, NULL) != C_OK))
         return;
 
+    //以写操作读取出key对象的value值
     subject = lookupKeyWriteOrReply(c,c->argv[1],shared.czero);
+    //如果key不存在或value对象不是列表类型则直接返回
     if (subject == NULL || checkType(c,subject,OBJ_LIST)) return;
 
     listTypeIterator *li;
+    //如果toremove小于零，则从尾部向头部删除
     if (toremove < 0) {
         toremove = -toremove;
+        //创建迭代器，指向尾部元素
         li = listTypeInitIterator(subject,-1,LIST_HEAD);
     } else {
+        //如果toremove大于等于零，则从头部向尾部删除，创建迭代器
         li = listTypeInitIterator(subject,0,LIST_TAIL);
     }
 
     listTypeEntry entry;
+    //遍历列表，保存迭代器当前指向的entry
     while (listTypeNext(li,&entry)) {
+        //如果当前entry的值是obj
         if (listTypeEqual(&entry,obj)) {
+            //删除当前的entry
             listTypeDelete(li, &entry);
             server.dirty++;
+            //更新计数器
             removed++;
+            //如果删除了count个，则跳出循环
             if (toremove && removed == toremove) break;
         }
     }
+
+    //释放迭代器
     listTypeReleaseIterator(li);
 
+    //如果删除成功
     if (removed) {
+        //当数据库的键被改动，则会调用该函数发送信号
         signalModifiedKey(c,c->db,c->argv[1]);
+        //发送"lrem"时间通知
         notifyKeyspaceEvent(NOTIFY_LIST,"lrem",c->argv[1],c->db->id);
     }
 
+    //如果将列表中的元素全部删除完了
     if (listTypeLength(subject) == 0) {
+        //从数据库中删除键key
         dbDelete(c->db,c->argv[1]);
+        //发送"del"时间通知
         notifyKeyspaceEvent(NOTIFY_GENERIC,"del",c->argv[1],c->db->id);
     }
 
+    //发送删除元素的个数给client
     addReplyLongLong(c,removed);
 }
 
@@ -798,54 +819,77 @@ void lremCommand(client *c) {
  * since the element is not just returned but pushed against another list
  * as well. This command was originally proposed by Ezra Zygmuntowicz.
  */
-
+//将一个value推入到列表头部，被rpoplpushCommand调用
 void rpoplpushHandlePush(client *c, robj *dstkey, robj *dstobj, robj *value) {
     /* Create the list if the key does not exist */
+    //如果目标dstkey不存在
     if (!dstobj) {
+        //创建一个quicklist对象
         dstobj = createQuicklistObject();
+        //设置ziplist的最大长度和压缩程度
         quicklistSetOptions(dstobj->ptr, server.list_max_ziplist_size,
                             server.list_compress_depth);
+        //将key添加到数据库中
         dbAdd(c->db,dstkey,dstobj);
     }
+    //当数据库的键被改动，则会调用该函数发送信号
     signalModifiedKey(c,c->db,dstkey);
+    //将vlaue推入到列表的头部
     listTypePush(dstobj,value,LIST_HEAD);
+    //发送"lpush"时间通知
     notifyKeyspaceEvent(NOTIFY_LIST,"lpush",dstkey,c->db->id);
     /* Always send the pushed value to the client. */
+    //将value值发送给client
     addReplyBulk(c,value);
 }
 
+// RPOPLPUSH命令的实现
 void rpoplpushCommand(client *c) {
     robj *sobj, *value;
+    //以写操作读取source对象的值，并且检查数据类型是否为OBJ_LIST
     if ((sobj = lookupKeyWriteOrReply(c,c->argv[1],shared.null[c->resp]))
         == NULL || checkType(c,sobj,OBJ_LIST)) return;
 
+    //如果列表长度为0，没有元素，直接发送空信息
     if (listTypeLength(sobj) == 0) {
         /* This may only happen after loading very old RDB files. Recent
          * versions of Redis delete keys of empty lists. */
         addReplyNull(c);
     } else {
+        //以写操作读取destination对象的值
         robj *dobj = lookupKeyWrite(c->db,c->argv[2]);
-        robj *touchedkey = c->argv[1];
+        robj *touchedkey = c->argv[1]; //将source键备份
 
+        //如果目标对象类型是否是列表类型
         if (dobj && checkType(c,dobj,OBJ_LIST)) return;
+        //从source尾部弹出一个元素
         value = listTypePop(sobj,LIST_TAIL);
         /* We saved touched key, and protect it, since rpoplpushHandlePush
          * may change the client command argument vector (it does not
          * currently). */
+        //备份一份source键，因为rpoplpushHandlePush可能会更改client命令行参数
         incrRefCount(touchedkey);
+        //将一个value推入到destination列表头部，如果destination列表不存在，则新创建一个
         rpoplpushHandlePush(c,c->argv[2],dobj,value);
 
         /* listTypePop returns an object with its refcount incremented */
+        //将弹出的value释放
         decrRefCount(value);
 
         /* Delete the source list when it is empty */
+        //发送"rpop"时间通知
         notifyKeyspaceEvent(NOTIFY_LIST,"rpop",touchedkey,c->db->id);
+        //如果source列表为空了，则删除key
         if (listTypeLength(sobj) == 0) {
+            //删除之前备份的key键
             dbDelete(c->db,touchedkey);
+            //发送"rpop"时间通知
             notifyKeyspaceEvent(NOTIFY_GENERIC,"del",
                                 touchedkey,c->db->id);
         }
+        //当数据库的键被改动，则会调用该函数发送信号
         signalModifiedKey(c,c->db,touchedkey);
+        //释放备份的source键
         decrRefCount(touchedkey);
         server.dirty++;
         if (c->cmd->proc == brpoplpushCommand) {
@@ -877,20 +921,28 @@ void rpoplpushCommand(client *c) {
  * should be undone as the client was not served: This only happens for
  * BRPOPLPUSH that fails to push the value to the destination key as it is
  * of the wrong type. */
+//receiver是被阻塞的客户端，key是造成阻塞的键，db是key所在的数据库，value是被提供给客户端的值
+//如果dstkey不为空，则将value推入到dstkey中
 int serveClientBlockedOnList(client *receiver, robj *key, robj *dstkey, redisDb *db, robj *value, int where)
 {
     robj *argv[3];
 
+    //如果dstkey为空，则执行的是BLPOP或BRPOP
     if (dstkey == NULL) {
         /* Propagate the [LR]POP operation. */
+        //根据where判断出是LPOP还是RPOP命令
         argv[0] = (where == LIST_HEAD) ? shared.lpop :
                                           shared.rpop;
+        //弹出元素的key
         argv[1] = key;
+        //将[LR]POP命令传播到AOF和REPL
         propagate((where == LIST_HEAD) ?
             server.lpopCommand : server.rpopCommand,
             db->id,argv,2,PROPAGATE_AOF|PROPAGATE_REPL);
 
         /* BRPOP/BLPOP */
+        /* BRPOP/BLPOP */
+        //发送回复信息
         addReplyArrayLen(receiver,2);
         addReplyBulk(receiver,key);
         addReplyBulk(receiver,value);
@@ -898,24 +950,28 @@ int serveClientBlockedOnList(client *receiver, robj *key, robj *dstkey, redisDb 
         /* Notify event. */
         char *event = (where == LIST_HEAD) ? "lpop" : "rpop";
         notifyKeyspaceEvent(NOTIFY_LIST,event,key,receiver->db->id);
-    } else {
+    } else { //dstkey不为空，执行BRPOPLPUSH命令
         /* BRPOPLPUSH */
+        //以读操作将dstkey对象的值读出来
         robj *dstobj =
             lookupKeyWrite(receiver->db,dstkey);
+
+        //如果dstobj对象是列表类型，将BRPOPLPUSH命令分为RPOP和LPUSH分别处理
         if (!(dstobj &&
              checkType(receiver,dstobj,OBJ_LIST)))
         {
+            //保存RPOP命令和被弹出元素的键
             rpoplpushHandlePush(receiver,dstkey,dstobj,
                 value);
             /* Propagate the RPOPLPUSH operation. */
             argv[0] = shared.rpoplpush;
             argv[1] = key;
             argv[2] = dstkey;
+            //将RPOP命令传播到AOF和REPL
             propagate(server.rpoplpushCommand,
                 db->id,argv,3,
                 PROPAGATE_AOF|
                 PROPAGATE_REPL);
-
             /* Notify event ("lpush" was notified by rpoplpushHandlePush). */
             notifyKeyspaceEvent(NOTIFY_LIST,"rpop",key,receiver->db->id);
         } else {
@@ -928,42 +984,61 @@ int serveClientBlockedOnList(client *receiver, robj *key, robj *dstkey, redisDb 
 }
 
 /* Blocking RPOP/LPOP */
+// BRPOP BLPOP 命令的底层实现
+//  BLPOP key [key ...] timeout
 void blockingPopGenericCommand(client *c, int where) {
     robj *o;
     mstime_t timeout;
     int j;
 
+    // 以秒为单位取出timeout值
     if (getTimeoutFromObjectOrReply(c,c->argv[c->argc-1],&timeout,UNIT_SECONDS)
         != C_OK) return;
 
+    //遍历所有的key
     for (j = 1; j < c->argc-1; j++) {
+        //以写操作取出当前key的值
         o = lookupKeyWrite(c->db,c->argv[j]);
         if (o != NULL) {
+            // 如果value对象的类型不是列表类型，发送类型错误信息
             if (o->type != OBJ_LIST) {
                 addReply(c,shared.wrongtypeerr);
                 return;
             } else {
+                // 列表长度不为0
                 if (listTypeLength(o) != 0) {
                     /* Non empty list, this is like a normal [LR]POP. */
+                    // 保存事件名称
                     char *event = (where == LIST_HEAD) ? "lpop" : "rpop";
+                    // 保存弹出的value对象
                     robj *value = listTypePop(o,where);
                     serverAssert(value != NULL);
 
+                    // 发送回复给client
                     addReplyArrayLen(c,2);
                     addReplyBulk(c,c->argv[j]);
                     addReplyBulk(c,value);
+                    // 释放value
                     decrRefCount(value);
+                    // 发送事件通知
                     notifyKeyspaceEvent(NOTIFY_LIST,event,
                                         c->argv[j],c->db->id);
+                    
+                    //如果弹出元素后列表为空
                     if (listTypeLength(o) == 0) {
+                        //从数据库中删除当前的key
                         dbDelete(c->db,c->argv[j]);
+                        // 发送"del"的事件通知
                         notifyKeyspaceEvent(NOTIFY_GENERIC,"del",
                                             c->argv[j],c->db->id);
                     }
+                    //数据库的键被修改，发送信号
                     signalModifiedKey(c,c->db,c->argv[j]);
+                    //更新脏键
                     server.dirty++;
 
                     /* Replicate it as an [LR]POP instead of B[LR]POP. */
+                    // 传播一个[LR]POP 而不是B[LR]POP
                     rewriteClientCommandVector(c,2,
                         (where == LIST_HEAD) ? shared.lpop : shared.rpop,
                         c->argv[j]);
@@ -975,12 +1050,14 @@ void blockingPopGenericCommand(client *c, int where) {
 
     /* If we are inside a MULTI/EXEC and the list is empty the only thing
      * we can do is treating it as a timeout (even with timeout 0). */
+    // 如果命令在一个事务中执行，则发送一个空回复以避免死等待
     if (c->flags & CLIENT_MULTI) {
         addReplyNullArray(c);
         return;
     }
 
     /* If the keys do not exist we must block */
+    // 参数中的所有键都不存在，则阻塞这些键
     blockForKeys(c,BLOCKED_LIST,c->argv + 1,c->argc - 2,timeout,NULL,NULL);
 }
 
@@ -992,29 +1069,38 @@ void brpopCommand(client *c) {
     blockingPopGenericCommand(c,LIST_TAIL);
 }
 
+// BRPOPLPUSH命令的实现
 void brpoplpushCommand(client *c) {
     mstime_t timeout;
 
+    //以秒为单位取出超时时间
     if (getTimeoutFromObjectOrReply(c,c->argv[3],&timeout,UNIT_SECONDS)
         != C_OK) return;
 
+    //以写操作读取出 source的值
     robj *key = lookupKeyWrite(c->db, c->argv[1]);
 
+    //如果键为空，阻塞
     if (key == NULL) {
+        // 如果命令在一个事务中执行，则发送一个空回复以避免死等待
         if (c->flags & CLIENT_MULTI) {
             /* Blocking against an empty list in a multi state
              * returns immediately. */
             addReplyNull(c);
         } else {
             /* The list is empty and the client blocks. */
+            // 列表为空，则将client阻塞
             blockForKeys(c,BLOCKED_LIST,c->argv + 1,1,timeout,c->argv[2],NULL);
         }
-    } else {
+    } else { //如果键不为空，指向RPOPLPUSH
+
+        //判断取出的value对象是否为列表类型，不是的话发送类型错误信息
         if (key->type != OBJ_LIST) {
             addReply(c, shared.wrongtypeerr);
         } else {
             /* The list exists and has elements, so
              * the regular rpoplpushCommand is executed. */
+            // value对象的列表存在且有元素，所以调用普通的rpoplpush命令
             serverAssertWithInfo(c,key,listTypeLength(key) > 0);
             rpoplpushCommand(c);
         }
