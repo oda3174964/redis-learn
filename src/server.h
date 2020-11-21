@@ -687,12 +687,19 @@ typedef struct clientReplyBlock {
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
 typedef struct redisDb {
+    // 键值对字典，保存数据库中所有的键值对
     dict *dict;                 /* The keyspace for this DB */
+    // 过期字典，保存着设置过期的键和键的过期时间
     dict *expires;              /* Timeout of keys with a timeout set */
+    // 保存着 所有造成客户端阻塞的键和被阻塞的客户端
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
+    // 保存着 处于阻塞状态的键，value为NULL
     dict *ready_keys;           /* Blocked keys that received a PUSH */
+    // 事物模块，用于保存被WATCH命令所监控的键
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
+    // 数据库ID
     int id;                     /* Database ID */
+    // 键的平均过期时间
     long long avg_ttl;          /* Average TTL, just for stats */
     unsigned long expires_cursor; /* Cursor of the active expire cycle. */
     list *defrag_later;         /* List of key names to attempt to defrag one by one, gradually. */

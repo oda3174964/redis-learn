@@ -2496,6 +2496,7 @@ void backgroundSaveDoneHandler(int exitcode, int bysignal) {
  * the cleanup needed. */
 void killRDBChild(void) {
     kill(server.rdb_child_pid,SIGUSR1);
+    // 删除临时文件
     rdbRemoveTempFile(server.rdb_child_pid, 0);
     closeChildInfoPipe();
     updateDictResizePolicy();
