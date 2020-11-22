@@ -439,15 +439,25 @@ extern int configOOMScoreAdjValuesDefaults[CONFIG_OOM_COUNT];
 
 /* Keyspace changes notification classes. Every class is associated with a
  * character for configuration purposes. */
+//键空间通知
 #define NOTIFY_KEYSPACE (1<<0)    /* K */
+//键事件通知
 #define NOTIFY_KEYEVENT (1<<1)    /* E */
+//通用无类型通知
 #define NOTIFY_GENERIC (1<<2)     /* g */
+//字符串类型键通知
 #define NOTIFY_STRING (1<<3)      /* $ */
+//列表键通知
 #define NOTIFY_LIST (1<<4)        /* l */
+//集合键通知
 #define NOTIFY_SET (1<<5)         /* s */
+//哈希键通知
 #define NOTIFY_HASH (1<<6)        /* h */
+//有序集合键通知
 #define NOTIFY_ZSET (1<<7)        /* z */
+//过期有关的键通知
 #define NOTIFY_EXPIRED (1<<8)     /* x */
+//驱逐有关的键通知
 #define NOTIFY_EVICTED (1<<9)     /* e */
 #define NOTIFY_STREAM (1<<10)     /* t */
 #define NOTIFY_KEY_MISS (1<<11)   /* m (Note: This one is excluded from NOTIFY_ALL on purpose) */
@@ -1101,6 +1111,7 @@ struct redisServer {
                                    is enabled. */
     int hz;                     /* serverCron() calls frequency in hertz */
     int in_fork_child;          /* indication that this is a fork child */
+    // 数据库数组，长度为16
     redisDb *db;
     dict *commands;             /* Command table */
     dict *orig_commands;        /* Command table before command renaming. */
@@ -1144,6 +1155,7 @@ struct redisServer {
     list *clients_to_close;     /* Clients to close asynchronously */
     list *clients_pending_write; /* There is to write or install handler. */
     list *clients_pending_read;  /* Client has pending read socket buffers. */
+    // 从节点列表和监视器列表
     list *slaves, *monitors;    /* List of slaves and MONITORs */
     client *current_client;     /* Current client executing the command. */
     rax *clients_timeout_table; /* Radix tree for blocked clients timeouts. */
@@ -1163,10 +1175,15 @@ struct redisServer {
     long long events_processed_while_blocked; /* processEventsWhileBlocked() */
 
     /* RDB / AOF loading information */
+    // 正在载入状态
     volatile sig_atomic_t loading; /* We are loading data from disk if true */
+    // 设置载入的总字节
     off_t loading_total_bytes;
+    // 已载入的字节数
     off_t loading_loaded_bytes;
+    // 载入的开始时间
     time_t loading_start_time;
+    // 在load时，用来设置读或写的最大字节数max_processing_chunk
     off_t loading_process_events_interval_bytes;
     /* Fast pointers to often looked up command */
     struct redisCommand *delCommand, *multiCommand, *lpushCommand,
@@ -1190,8 +1207,11 @@ struct redisServer {
     long long stat_active_defrag_key_hits;  /* number of keys with moved allocations */
     long long stat_active_defrag_key_misses;/* number of keys scanned and not moved */
     long long stat_active_defrag_scanned;   /* number of dictEntries scanned */
+    // 服务器内存使用的
     size_t stat_peak_memory;        /* Max used memory record */
+    // 计算fork()的时间
     long long stat_fork_time;       /* Time needed to perform latest fork() */
+    // 计算fork的速率，GB/每秒
     double stat_fork_rate;          /* Fork rate in GB/sec. */
     long long stat_rejected_conn;   /* Clients rejected because of maxclients */
     long long stat_sync_full;       /* Number of full resyncs with slaves. */
@@ -1282,25 +1302,43 @@ struct redisServer {
                                       to child process. */
     sds aof_child_diff;             /* AOF diff accumulator child side. */
     /* RDB persistence */
+    // 脏键，记录数据库被修改的次数
     long long dirty;                /* Changes to DB from the last save */
+    // 在BGSAVE之前要备份脏键dirty的值，如果BGSAVE失败会还原
     long long dirty_before_bgsave;  /* Used to restore dirty on failed BGSAVE */
+    // 执行BGSAVE的子进程的pid
     pid_t rdb_child_pid;            /* PID of RDB saving child */
+    // 保存save参数的数组
     struct saveparam *saveparams;   /* Save points array for RDB */
+    // 数组长度
     int saveparamslen;              /* Number of saving points */
+    // RDB文件的名字，默认为dump.rdb
     char *rdb_filename;             /* Name of RDB file */
+    // 是否采用LZF压缩算法压缩RDB文件，默认yes
     int rdb_compression;            /* Use compression in RDB? */
+    // RDB文件是否使用校验和，默认yes
     int rdb_checksum;               /* Use RDB checksum? */
     int rdb_del_sync_files;         /* Remove RDB files used only for SYNC if
                                        the instance does not use persistence. */
+    // 上一次执行SAVE成功的时间
     time_t lastsave;                /* Unix time of last successful save */
+    // 最近一个尝试执行BGSAVE的时间
     time_t lastbgsave_try;          /* Unix time of last attempted bgsave */
+    // 最近执行BGSAVE的时间
     time_t rdb_save_time_last;      /* Time used by last RDB save run. */
+    // BGSAVE开始的时间
     time_t rdb_save_time_start;     /* Current RDB save start time. */
+    // 当rdb_bgsave_scheduled为真时，才能开始BGSAVE
     int rdb_bgsave_scheduled;       /* BGSAVE when possible if true. */
+    // rdb执行的类型，是写入磁盘，还是写入从节点的socket
     int rdb_child_type;             /* Type of save by active child. */
+    // BGSAVE执行完的状态
     int lastbgsave_status;          /* C_OK or C_ERR */
+    // 如果不能执行BGSAVE则不能写
     int stop_writes_on_bgsave_err;  /* Don't allow writes if can't BGSAVE */
+    // 无磁盘同步，管道的写端
     int rdb_pipe_write;             /* RDB pipes used to transfer the rdb */
+    // 无磁盘同步，管道的读端
     int rdb_pipe_read;              /* data to the parent process in diskless repl. */
     connection **rdb_pipe_conns;    /* Connections which are currently the */
     int rdb_pipe_numconns;          /* target of diskless rdb fork child. */
@@ -1426,9 +1464,11 @@ struct redisServer {
     int list_max_ziplist_size;
     int list_compress_depth;
     /* time cache */
+    // 保存秒单位的Unix时间戳的缓存
     _Atomic time_t unixtime;    /* Unix time sampled every cron cycle. */
     time_t timezone;            /* Cached timezone. As set by tzset(). */
     int daylight_active;        /* Currently in daylight saving time. */
+    // 保存毫秒单位的Unix时间戳的缓存
     mstime_t mstime;            /* 'unixtime' in milliseconds. */
     ustime_t ustime;            /* 'unixtime' in microseconds. */
     /* Pubsub */
@@ -1485,7 +1525,9 @@ struct redisServer {
     int lazyfree_lazy_server_del;
     int lazyfree_lazy_user_del;
     /* Latency monitor */
+    // 延迟的阀值
     long long latency_monitor_threshold;
+    // 延迟与造成延迟的事件关联的字典
     dict *latency_events;
     /* ACLs */
     char *acl_filename;     /* ACL Users file. NULL if not configured. */

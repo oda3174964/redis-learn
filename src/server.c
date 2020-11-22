@@ -4975,8 +4975,11 @@ int redisFork(int purpose) {
 }
 
 void sendChildCOWInfo(int ptype, char *pname) {
+    // 得到子进程进程的脏私有虚拟页面大小，如果做RDB的同时父进程正在写入的数据，
+    // 那么子进程就会拷贝一个份父进程的内存，而不是和父进程共享一份内存。
     size_t private_dirty = zmalloc_get_private_dirty(-1);
 
+    // 将子进程分配的内容写日志
     if (private_dirty) {
         serverLog(LL_NOTICE,
             "%s: %zu MB of memory used by copy-on-write",

@@ -44,6 +44,7 @@ struct _rio {
     /* Backend functions.
      * Since this functions do not tolerate short writes or reads the return
      * value is simplified to: zero on error, non zero on complete success. */
+    // 读，写，读写偏移量、刷新操作的函数指针，非0表示成功
     size_t (*read)(struct _rio *, void *buf, size_t len);
     size_t (*write)(struct _rio *, const void *buf, size_t len);
     off_t (*tell)(struct _rio *);
@@ -53,28 +54,37 @@ struct _rio {
      * designed so that can be called with the current checksum, and the buf
      * and len fields pointing to the new block of data to add to the checksum
      * computation. */
+    // 计算和校验函数
     void (*update_cksum)(struct _rio *, const void *buf, size_t len);
 
     /* The current checksum and flags (see RIO_FLAG_*) */
+    // 当前校验和
     uint64_t cksum, flags;
 
     /* number of bytes read or written */
+    // 读或写的字节数
     size_t processed_bytes;
 
     /* maximum single read or write chunk size */
+    // 每次读或写的最大字节数
     size_t max_processing_chunk;
 
     /* Backend-specific vars. */
+    // 读写的各种对象
     union {
         /* In-memory buffer target. */
+        // 内存缓冲区
         struct {
-            sds ptr;
-            off_t pos;
+            sds ptr; //缓冲区的指针，本质是char *
+            off_t pos; //缓冲区的偏移量
         } buffer;
         /* Stdio file pointer target. */
+        // 标准文件IO
         struct {
-            FILE *fp;
+            FILE *fp; // 文件指针，指向被打开的文件
+            // 最近一次同步之后所写的字节数
             off_t buffered; /* Bytes written since last fsync. */
+            // 写入设置的autosync字节后，会执行fsync()同步
             off_t autosync; /* fsync after 'autosync' bytes written. */
         } file;
         /* Connection object (used to read from socket) */
@@ -86,9 +96,13 @@ struct _rio {
             size_t read_so_far; /* amount of data read from the rio (not buffered) */
         } conn;
         /* FD target (used to write to pipe). */
+        // 文件描述符 
         struct {
+            // 文件描述符数组
             int fd;       /* File descriptor. */
+            // 偏移量
             off_t pos;
+            // 缓冲区
             sds buf;
         } fd;
     } io;
@@ -103,14 +117,20 @@ typedef struct _rio rio;
 static inline size_t rioWrite(rio *r, const void *buf, size_t len) {
     if (r->flags & RIO_FLAG_WRITE_ERROR) return 0;
     while (len) {
+        // 写的字节长度，不能超过每次读或写的最大字节数max_processing_chunk
         size_t bytes_to_write = (r->max_processing_chunk && r->max_processing_chunk < len) ? r->max_processing_chunk : len;
+        // 更新和校验
         if (r->update_cksum) r->update_cksum(r,buf,bytes_to_write);
+        // 调用自身的write方法写入
         if (r->write(r,buf,bytes_to_write) == 0) {
             r->flags |= RIO_FLAG_WRITE_ERROR;
             return 0;
         }
+        // 更新偏移量，指向下一个写的位置
         buf = (char*)buf + bytes_to_write;
+        // 计算剩余写入的长度
         len -= bytes_to_write;
+        // 更新读或写的字节数
         r->processed_bytes += bytes_to_write;
     }
     return 1;
@@ -119,23 +139,31 @@ static inline size_t rioWrite(rio *r, const void *buf, size_t len) {
 static inline size_t rioRead(rio *r, void *buf, size_t len) {
     if (r->flags & RIO_FLAG_READ_ERROR) return 0;
     while (len) {
+        // 读的字节长度，不能超过每次读或写的最大字节数max_processing_chunk
         size_t bytes_to_read = (r->max_processing_chunk && r->max_processing_chunk < len) ? r->max_processing_chunk : len;
+        // 调用自身的read方法读到buf中
         if (r->read(r,buf,bytes_to_read) == 0) {
             r->flags |= RIO_FLAG_READ_ERROR;
             return 0;
         }
+        // 更新和校验
         if (r->update_cksum) r->update_cksum(r,buf,bytes_to_read);
+        // 更新偏移量，指向下一个读的位置
         buf = (char*)buf + bytes_to_read;
+        // 计算剩余要读的长度
         len -= bytes_to_read;
+        // 更新读或写的字节数
         r->processed_bytes += bytes_to_read;
     }
     return 1;
 }
 
+//返回当前偏移量
 static inline off_t rioTell(rio *r) {
     return r->tell(r);
 }
 
+//缓冲区冲洗函数
 static inline int rioFlush(rio *r) {
     return r->flush(r);
 }
