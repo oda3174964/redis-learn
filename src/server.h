@@ -1276,6 +1276,7 @@ struct redisServer {
     int aof_rewrite_scheduled;      /* Rewrite once BGSAVE terminates. */
     pid_t aof_child_pid;            /* PID if rewriting process */
     list *aof_rewrite_buf_blocks;   /* Hold changes during an AOF rewrite. */
+    // AOF缓冲区，在进入事件loop之前写入
     sds aof_buf;      /* AOF buffer, written before entering the event loop */
     int aof_fd;       /* File descriptor of currently selected AOF file */
     int aof_selected_db; /* Currently selected DB in AOF */
@@ -1292,11 +1293,17 @@ struct redisServer {
     int aof_load_truncated;         /* Don't stop on unexpected AOF EOF. */
     int aof_use_rdb_preamble;       /* Use RDB preamble on AOF rewrites. */
     /* AOF pipes used to communicate between parent and child during rewrite. */
+    //父进程写给子进程的文件描述符
     int aof_pipe_write_data_to_child;
+    //子进程从父进程读的文件描述符
     int aof_pipe_read_data_from_parent;
+    //子进程写ack给父进程的文件描述符
     int aof_pipe_write_ack_to_parent;
+    //父进程从子进程读ack的文件描述符
     int aof_pipe_read_ack_from_child;
+    //父进程写ack给子进程的文件描述符
     int aof_pipe_write_ack_to_child;
+    //子进程从父进程读ack的文件描述符
     int aof_pipe_read_ack_from_parent;
     int aof_stop_sending_diff;     /* If true stop sending accumulated diffs
                                       to child process. */
