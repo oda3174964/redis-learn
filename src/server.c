@@ -2500,10 +2500,12 @@ void createSharedObjects(void) {
     shared.maxstring = sdsnew("maxstring");
 }
 
+// 初始化服务器配置
 void initServerConfig(void) {
     int j;
 
     updateCachedTime(1);
+    // 长度为40字节的服务器ID
     getRandomHexChars(server.runid,CONFIG_RUN_ID_SIZE);
     server.runid[CONFIG_RUN_ID_SIZE] = '\0';
     changeReplicationId();
@@ -2554,6 +2556,7 @@ void initServerConfig(void) {
     server.lruclock = getLRUClock();
     resetServerSaveParams();
 
+    // SAVE的参数
     appendServerSaveParams(60*60,1);  /* save after 1 hour and 1 change */
     appendServerSaveParams(300,100);  /* save after 5 minutes and 100 changes */
     appendServerSaveParams(60,10000); /* save after 1 minute and 10000 changes */
@@ -2589,6 +2592,7 @@ void initServerConfig(void) {
         server.oom_score_adj_values[j] = configOOMScoreAdjValuesDefaults[j];
 
     /* Double constants initialization */
+    // 全局double类型常量实现
     R_Zero = 0.0;
     R_PosInf = 1.0/R_Zero;
     R_NegInf = -1.0/R_Zero;
@@ -2597,6 +2601,8 @@ void initServerConfig(void) {
     /* Command table -- we initialize it here as it is part of the
      * initial configuration, since command names may be changed via
      * redis.conf using the rename-command directive. */
+
+    // 初始化命令表
     server.commands = dictCreate(&commandTableDictType,NULL);
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
     populateCommandTable();
@@ -3182,6 +3188,7 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
+    // 为每一个TCP连接的client创建文件事件，并安装acceptTcpHandler()函数来accept连接
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
@@ -3190,7 +3197,7 @@ void initServer(void) {
                     "Unrecoverable error creating server.ipfd file event.");
             }
     }
-    // 为每一个TCP连接的client创建文件事件，并安装acceptTcpHandler()函数来accept连接
+    
     for (j = 0; j < server.tlsfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.tlsfd[j], AE_READABLE,
             acceptTLSHandler,NULL) == AE_ERR)
@@ -5550,6 +5557,7 @@ int main(int argc, char **argv) {
 #endif
     // 本函数用来配置地域的信息，设置当前程序使用的本地化信息，LC_COLLATE 配置字符串比较
     setlocale(LC_COLLATE,"");
+    // 设置时间环境变量
     tzset(); /* Populates 'timezone' global. */
     // 设置内存溢出的处理函数
     zmalloc_set_oom_handler(redisOutOfMemoryHandler);
@@ -5716,10 +5724,11 @@ int main(int argc, char **argv) {
     #ifdef __linux__
         linuxMemoryWarnings(); // 打印内存警告
     #endif
-        // 从AOF文件或RDB文件载入数据
+        
         moduleLoadFromQueue();
         ACLLoadUsersAtStartup();
         InitServerLast();
+        // 从AOF文件或RDB文件载入数据
         loadDataFromDisk();
         // 如果开启了集群模式
         if (server.cluster_enabled) {

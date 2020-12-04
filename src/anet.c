@@ -81,10 +81,12 @@ int anetSetBlock(char *err, int fd, int non_block) {
     return ANET_OK;
 }
 
+// 设置非阻塞
 int anetNonBlock(char *err, int fd) {
     return anetSetBlock(err,fd,1);
 }
 
+// 设置阻塞
 int anetBlock(char *err, int fd) {
     return anetSetBlock(err,fd,0);
 }
@@ -451,7 +453,9 @@ int anetWrite(int fd, char *buf, int count)
     return totlen;
 }
 
+// 监听端口
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
+    // 绑定
     if (bind(s,sa,len) == -1) {
         anetSetError(err, "bind: %s", strerror(errno));
         close(s);
