@@ -73,11 +73,13 @@ void raxDebugShowNode(const char *msg, raxNode *n);
 #endif
 
 /* By default log debug info if RAX_DEBUG_MSG is defined. */
+// 默认开启debug
 static int raxDebugMsg = 1;
 
 /* When debug messages are enabled, turn them on/off dynamically. By
  * default they are enabled. Set the state to 0 to disable, and 1 to
  * re-enable. */
+// 设置debug开关
 void raxSetDebugMsg(int onoff) {
     raxDebugMsg = onoff;
 }
@@ -100,6 +102,7 @@ static inline void raxStackInit(raxStack *ts) {
 
 /* Push an item into the stack, returns 1 on success, 0 on out of memory. */
 static inline int raxStackPush(raxStack *ts, void *ptr) {
+    // 达到最大进行扩容
     if (ts->items == ts->maxitems) {
         if (ts->stack == ts->static_items) {
             ts->stack = rax_malloc(sizeof(void*)*ts->maxitems*2);
@@ -128,6 +131,7 @@ static inline int raxStackPush(raxStack *ts, void *ptr) {
 
 /* Pop an item from the stack, the function returns NULL if there are no
  * items to pop. */
+// 弹出一个元素
 static inline void *raxStackPop(raxStack *ts) {
     if (ts->items == 0) return NULL;
     ts->items--;
@@ -136,6 +140,7 @@ static inline void *raxStackPop(raxStack *ts) {
 
 /* Return the stack item at the top of the stack without actually consuming
  * it. */
+// 返回栈顶元素
 static inline void *raxStackPeek(raxStack *ts) {
     if (ts->items == 0) return NULL;
     return ts->stack[ts->items-1];
@@ -185,6 +190,7 @@ static inline void raxStackFree(raxStack *ts) {
  * If datafiled is true, the allocation is made large enough to hold the
  * associated data pointer.
  * Returns the new node pointer. On out of memory NULL is returned. */
+// 创建一个结点
 raxNode *raxNewNode(size_t children, int datafield) {
     size_t nodesize = sizeof(raxNode)+children+raxPadding(children)+
                       sizeof(raxNode*)*children;
@@ -200,6 +206,7 @@ raxNode *raxNewNode(size_t children, int datafield) {
 
 /* Allocate a new rax and return its pointer. On out of memory the function
  * returns NULL. */
+// 创建一个基数树
 rax *raxNew(void) {
     rax *rax = rax_malloc(sizeof(*rax));
     if (rax == NULL) return NULL;

@@ -138,8 +138,9 @@ typedef struct raxNode {
     unsigned char data[];
 } raxNode;
 
+// 基数树
 typedef struct rax {
-    raxNode *head;
+    raxNode *head; //头结点
     uint64_t numele;
     uint64_t numnodes;
 } rax;
@@ -180,6 +181,8 @@ typedef int (*raxNodeCallback)(raxNode **noderef);
 #define RAX_ITER_EOF (1<<1)    /* End of iteration reached. */
 #define RAX_ITER_SAFE (1<<2)   /* Safe iterator, allows operations while
                                   iterating. But it is slower. */
+
+// 迭代器
 typedef struct raxIterator {
     int flags;
     rax *rt;                /* Radix tree we are iterating. */
