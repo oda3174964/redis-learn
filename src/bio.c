@@ -147,10 +147,14 @@ void bioCreateBackgroundJob(int type, void *arg1, void *arg2, void *arg3) {
     job->arg1 = arg1;
     job->arg2 = arg2;
     job->arg3 = arg3;
+    // 加锁
     pthread_mutex_lock(&bio_mutex[type]);
+    // 将新的 job 放到对应 job queue 中
     listAddNodeTail(bio_jobs[type],job);
     bio_pending[type]++;
+    // 条件变量通知有新的 job 产生
     pthread_cond_signal(&bio_newjob_cond[type]);
+    // 解锁
     pthread_mutex_unlock(&bio_mutex[type]);
 }
 
@@ -205,6 +209,7 @@ void *bioProcessBackgroundJobs(void *arg) {
             continue;
         }
         /* Pop the job from the queue. */
+        // 从这种任务的 list 中取出来一个
         ln = listFirst(bio_jobs[type]);
         job = ln->value;
         /* It is now possible to unlock the background system as we know have
@@ -212,6 +217,7 @@ void *bioProcessBackgroundJobs(void *arg) {
         pthread_mutex_unlock(&bio_mutex[type]);
 
         /* Process the job accordingly to its type. */
+        // 不同类型的 job 做不同的处理
         if (type == BIO_CLOSE_FILE) {
             close((long)job->arg1);
         } else if (type == BIO_AOF_FSYNC) {
@@ -234,8 +240,14 @@ void *bioProcessBackgroundJobs(void *arg) {
 
         /* Lock again before reiterating the loop, if there are no longer
          * jobs to process we'll block again in pthread_cond_wait(). */
+        /*
+         * 下一次循环前需要再一次加锁
+         * 如果没有相应的 job，将再一次在 pthread_cond_wait() 阻塞住。
+         */
         pthread_mutex_lock(&bio_mutex[type]);
+        // 删掉执行过的 job
         listDelNode(bio_jobs[type],ln);
+        // 这种类型还没有出来 job 数减去 1
         bio_pending[type]--;
 
         /* Unblock threads blocked on bioWaitStepOfType() if any. */
