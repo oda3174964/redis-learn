@@ -61,10 +61,17 @@
 #include "server.h"
 #include "bio.h"
 
+// 后台I/O服务
+
+// 任务线程数组
 static pthread_t bio_threads[BIO_NUM_OPS];
+// 锁
 static pthread_mutex_t bio_mutex[BIO_NUM_OPS];
+// 条件变量
 static pthread_cond_t bio_newjob_cond[BIO_NUM_OPS];
+// 任务 list 数组
 static pthread_cond_t bio_step_cond[BIO_NUM_OPS];
+// 存放工作的队列
 static list *bio_jobs[BIO_NUM_OPS];
 /* The following array is used to hold the number of pending jobs for every
  * OP type. This allows us to export the bioPendingJobsOfType() API that is
@@ -72,6 +79,7 @@ static list *bio_jobs[BIO_NUM_OPS];
  * objects shared with the background thread. The main thread will just wait
  * that there are no longer jobs of this type to be executed before performing
  * the sensible operation. This data is also useful for reporting. */
+// 记录每种类型 job 队列里有多少 job 等待执行
 static unsigned long long bio_pending[BIO_NUM_OPS];
 
 /* This structure represents a background Job. It is only used locally to this
@@ -93,6 +101,7 @@ void lazyfreeFreeSlotsMapFromBioThread(zskiplist *sl);
 #define REDIS_THREAD_STACK_SIZE (1024*1024*4)
 
 /* Initialize the background system, spawning the thread. */
+// 初始化后台服务，启动后台线程
 void bioInit(void) {
     pthread_attr_t attr;
     pthread_t thread;
@@ -100,6 +109,7 @@ void bioInit(void) {
     int j;
 
     /* Initialization of state vars and objects */
+    // 初始化各任务类型的锁和条件变量, BIO_NUM_OPS 个
     for (j = 0; j < BIO_NUM_OPS; j++) {
         pthread_mutex_init(&bio_mutex[j],NULL);
         pthread_cond_init(&bio_newjob_cond[j],NULL);
@@ -109,6 +119,7 @@ void bioInit(void) {
     }
 
     /* Set the stack size as by default it may be small in some system */
+    //设置 stack 大小，因为某些系统默认值可能很小
     pthread_attr_init(&attr);
     pthread_attr_getstacksize(&attr,&stacksize);
     if (!stacksize) stacksize = 1; /* The world is full of Solaris Fixes */
@@ -118,6 +129,7 @@ void bioInit(void) {
     /* Ready to spawn our threads. We use the single argument the thread
      * function accepts in order to pass the job ID the thread is
      * responsible of. */
+    // 创建线程
     for (j = 0; j < BIO_NUM_OPS; j++) {
         void *arg = (void*)(unsigned long) j;
         if (pthread_create(&thread,&attr,bioProcessBackgroundJobs,arg) != 0) {
@@ -144,10 +156,12 @@ void bioCreateBackgroundJob(int type, void *arg1, void *arg2, void *arg3) {
 
 void *bioProcessBackgroundJobs(void *arg) {
     struct bio_job *job;
+    // 传入参数为 job type
     unsigned long type = (unsigned long) arg;
     sigset_t sigset;
 
     /* Check that the type is within the right interval. */
+    // 检查传入 type 的合理性
     if (type >= BIO_NUM_OPS) {
         serverLog(LL_WARNING,
             "Warning: bio thread started with wrong type %lu",type);
@@ -173,6 +187,7 @@ void *bioProcessBackgroundJobs(void *arg) {
     pthread_mutex_lock(&bio_mutex[type]);
     /* Block SIGALRM so we are sure that only the main thread will
      * receive the watchdog signal. */
+    // 阻塞 SIGALRM， 确保只有主线程将收到 watchdog 信号
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGALRM);
     if (pthread_sigmask(SIG_BLOCK, &sigset, NULL))
@@ -183,6 +198,8 @@ void *bioProcessBackgroundJobs(void *arg) {
         listNode *ln;
 
         /* The loop always starts with the lock hold. */
+        // 当没有 type 类型的任务时，会阻塞在这里，等待条件变量触发，这里会释放锁
+        // 当被激活后们首先要加锁
         if (listLength(bio_jobs[type]) == 0) {
             pthread_cond_wait(&bio_newjob_cond[type],&bio_mutex[type]);
             continue;

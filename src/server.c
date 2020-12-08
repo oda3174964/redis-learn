@@ -3022,7 +3022,9 @@ void resetServerStats(void) {
  * can work reliably (default cancelability type is PTHREAD_CANCEL_DEFERRED).
  * Needed for pthread_cancel used by the fast memory test used by the crash report. */
 void makeThreadKillable(void) {
+    // 设置线程可以被其他线程调用pthread_cancel函数取消/终止 （其他线程发来 cancel 请求）
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    // 收到信号后继续运行至下一个取消点再退出，默认是立即退出，与 PTHREAD_CANCEL_ENABLE –配合使用
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 }
 
