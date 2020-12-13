@@ -82,9 +82,13 @@ typedef struct bkinfo {
 /* Block a client for the specific operation type. Once the CLIENT_BLOCKED
  * flag is set client query buffer is not longer processed, but accumulated,
  * and will be processed when the client is unblocked. */
+// 阻塞一个客户端
 void blockClient(client *c, int btype) {
+    // 标志设置为阻塞
     c->flags |= CLIENT_BLOCKED;
+    // 操作类型
     c->btype = btype;
+    // 阻塞的数目加1
     server.blocked_clients++;
     server.blocked_clients_by_type[btype]++;
     addClientToTimeoutTable(c);
@@ -108,6 +112,7 @@ void processUnblockedClients(void) {
          * is blocked again. Actually processInputBuffer() checks that the
          * client is not blocked before to proceed, but things may change and
          * the code is conceptually more correct this way. */
+        // 客户端非阻塞的话，继续处理
         if (!(c->flags & CLIENT_BLOCKED)) {
             if (c->querybuf && sdslen(c->querybuf) > 0) {
                 processInputBuffer(c);
@@ -132,11 +137,14 @@ void processUnblockedClients(void) {
  * 4. With this function instead we can put the client in a queue that will
  *    process it for queries ready to be executed at a safe time.
  */
+// 入队一个处理的非阻塞客户端
 void queueClientForReprocessing(client *c) {
     /* The client may already be into the unblocked list because of a previous
      * blocking operation, don't add back it into the list multiple times. */
     if (!(c->flags & CLIENT_UNBLOCKED)) {
+        // 设置标志
         c->flags |= CLIENT_UNBLOCKED;
+        // 加入到链表尾部
         listAddNodeTail(server.unblocked_clients,c);
     }
 }
@@ -158,8 +166,10 @@ void unblockClient(client *c) {
     }
     /* Clear the flags, and put the client in the unblocked list so that
      * we'll process new commands in its query buffer ASAP. */
+    // 阻塞客户端减一
     server.blocked_clients--;
     server.blocked_clients_by_type[c->btype]--;
+    // 去掉阻塞的标志
     c->flags &= ~CLIENT_BLOCKED;
     c->btype = BLOCKED_NONE;
     removeClientFromTimeoutTable(c);
@@ -190,6 +200,7 @@ void replyToBlockedClientTimedOut(client *c) {
  *
  * The semantics is to send an -UNBLOCKED error to the client, disconnecting
  * it at the same time. */
+// 断开所有阻塞的客户端
 void disconnectAllBlockedClients(void) {
     listNode *ln;
     listIter li;
@@ -198,6 +209,7 @@ void disconnectAllBlockedClients(void) {
     while((ln = listNext(&li))) {
         client *c = listNodeValue(ln);
 
+        // 阻塞才进行操作
         if (c->flags & CLIENT_BLOCKED) {
             addReplySds(c,sdsnew(
                 "-UNBLOCKED force unblock from blocking operation, "

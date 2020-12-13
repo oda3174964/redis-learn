@@ -46,6 +46,7 @@ void openChildInfoPipe(void) {
 }
 
 /* Close the pipes opened with openChildInfoPipe(). */
+// 关闭管道
 void closeChildInfoPipe(void) {
     if (server.child_info_pipe[0] != -1 ||
         server.child_info_pipe[1] != -1)
@@ -59,6 +60,7 @@ void closeChildInfoPipe(void) {
 
 /* Send COW data to parent. The child should call this function after populating
  * the corresponding fields it want to sent (according to the process type). */
+// 发送信息
 void sendChildInfo(int ptype) {
     if (server.child_info_pipe[1] == -1) return;
     server.child_info_data.magic = CHILD_INFO_MAGIC;
@@ -70,6 +72,7 @@ void sendChildInfo(int ptype) {
 }
 
 /* Receive COW data from parent. */
+// 接收数据
 void receiveChildInfo(void) {
     if (server.child_info_pipe[0] == -1) return;
     ssize_t wlen = sizeof(server.child_info_data);

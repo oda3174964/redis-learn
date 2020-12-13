@@ -73,8 +73,9 @@ ConnectionType CT_Socket;
  * 3. The container_of() approach is anyway risky because connections may
  * be embedded in different structs, not just client.
  */
-
+// 创建一个连接
 connection *connCreateSocket() {
+    // 分配内存
     connection *conn = zcalloc(sizeof(connection));
     conn->type = &CT_Socket;
     conn->fd = -1;
@@ -92,15 +93,18 @@ connection *connCreateSocket() {
  * is not in an error state (which is not possible for a socket connection,
  * but could but possible with other protocols).
  */
+// 创建一个接收socket
 connection *connCreateAcceptedSocket(int fd) {
     connection *conn = connCreateSocket();
     conn->fd = fd;
+    // 设置状态
     conn->state = CONN_STATE_ACCEPTING;
     return conn;
 }
 
 static int connSocketConnect(connection *conn, const char *addr, int port, const char *src_addr,
         ConnectionCallbackFunc connect_handler) {
+    // 连接
     int fd = anetTcpNonBlockBestEffortBindConnect(NULL,addr,port,src_addr);
     if (fd == -1) {
         conn->state = CONN_STATE_ERROR;
@@ -109,6 +113,7 @@ static int connSocketConnect(connection *conn, const char *addr, int port, const
     }
 
     conn->fd = fd;
+    // 设置状态
     conn->state = CONN_STATE_CONNECTING;
 
     conn->conn_handler = connect_handler;
@@ -129,6 +134,7 @@ int connHasReadHandler(connection *conn) {
 }
 
 /* Associate a private data pointer with the connection */
+// 设置private数据
 void connSetPrivateData(connection *conn, void *data) {
     conn->private_data = data;
 }
@@ -145,10 +151,13 @@ void *connGetPrivateData(connection *conn) {
  */
 
 /* Close the connection and free resources. */
+// 关闭连接释放资源
 static void connSocketClose(connection *conn) {
     if (conn->fd != -1) {
+        // 删除fileevent
         aeDeleteFileEvent(server.el,conn->fd,AE_READABLE);
         aeDeleteFileEvent(server.el,conn->fd,AE_WRITABLE);
+        // 关闭socket
         close(conn->fd);
         conn->fd = -1;
     }
@@ -164,6 +173,7 @@ static void connSocketClose(connection *conn) {
     zfree(conn);
 }
 
+// 写数据
 static int connSocketWrite(connection *conn, const void *data, size_t data_len) {
     int ret = write(conn->fd, data, data_len);
     if (ret < 0 && errno != EAGAIN) {
@@ -179,6 +189,7 @@ static int connSocketWrite(connection *conn, const void *data, size_t data_len) 
     return ret;
 }
 
+// 读数据
 static int connSocketRead(connection *conn, void *buf, size_t buf_len) {
     int ret = read(conn->fd, buf, buf_len);
     if (!ret) {
@@ -199,10 +210,14 @@ static int connSocketRead(connection *conn, void *buf, size_t buf_len) {
 static int connSocketAccept(connection *conn, ConnectionCallbackFunc accept_handler) {
     int ret = C_OK;
 
+    // 状态不等于接收中返回错误
     if (conn->state != CONN_STATE_ACCEPTING) return C_ERR;
+    // 设置状态
     conn->state = CONN_STATE_CONNECTED;
 
+    // 增加引用
     connIncrRefs(conn);
+    // 调用回调函数
     if (!callHandler(conn, accept_handler)) ret = C_ERR;
     connDecrRefs(conn);
 
@@ -220,6 +235,7 @@ static int connSocketAccept(connection *conn, ConnectionCallbackFunc accept_hand
 static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc func, int barrier) {
     if (func == conn->write_handler) return C_OK;
 
+    // 写回调
     conn->write_handler = func;
     if (barrier)
         conn->flags |= CONN_FLAG_WRITE_BARRIER;
@@ -236,6 +252,7 @@ static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc fu
 /* Register a read handler, to be called when the connection is readable.
  * If NULL, the existing handler is removed.
  */
+// 设置读回调
 static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {
     if (func == conn->read_handler) return C_OK;
 
@@ -248,6 +265,7 @@ static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc fun
     return C_OK;
 }
 
+// 获取错误
 static const char *connSocketGetLastError(connection *conn) {
     return strerror(conn->last_errno);
 }
@@ -320,6 +338,7 @@ static int connSocketBlockingConnect(connection *conn, const char *addr, int por
     }
 
     conn->fd = fd;
+    // 设置状态连上
     conn->state = CONN_STATE_CONNECTED;
     return C_OK;
 }
@@ -327,15 +346,17 @@ static int connSocketBlockingConnect(connection *conn, const char *addr, int por
 /* Connection-based versions of syncio.c functions.
  * NOTE: This should ideally be refactored out in favor of pure async work.
  */
-
+// 异步写
 static ssize_t connSocketSyncWrite(connection *conn, char *ptr, ssize_t size, long long timeout) {
     return syncWrite(conn->fd, ptr, size, timeout);
 }
 
+// 异步读
 static ssize_t connSocketSyncRead(connection *conn, char *ptr, ssize_t size, long long timeout) {
     return syncRead(conn->fd, ptr, size, timeout);
 }
 
+// 读一行
 static ssize_t connSocketSyncReadLine(connection *conn, char *ptr, ssize_t size, long long timeout) {
     return syncReadLine(conn->fd, ptr, size, timeout);
 }
@@ -363,7 +384,7 @@ ConnectionType CT_Socket = {
     .get_type = connSocketGetType
 };
 
-
+// 获取socket错误
 int connGetSocketError(connection *conn) {
     int sockerr = 0;
     socklen_t errlen = sizeof(sockerr);

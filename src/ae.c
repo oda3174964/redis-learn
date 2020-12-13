@@ -625,7 +625,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
 /* Wait for milliseconds until the given file descriptor becomes
  * writable/readable/exception */
-// 等待milliseconds，知道fd的mask事件发生
+// 等待milliseconds，直到fd的mask事件发生
 int aeWait(int fd, int mask, long long milliseconds) {
     struct pollfd pfd;
     int retmask = 0, retval;
