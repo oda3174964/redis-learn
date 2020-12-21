@@ -1032,16 +1032,19 @@ void computeDefragCycles() {
     float frag_pct = getAllocatorFragmentation(&frag_bytes);
     /* If we're not already running, and below the threshold, exit. */
     if (!server.active_defrag_running) {
+		/* 根据计算的碎片率和大小与我们设置的参数进行比较判断，决定是否执行 */
         if(frag_pct < server.active_defrag_threshold_lower || frag_bytes < server.active_defrag_ignore_bytes)
             return;
     }
 
     /* Calculate the adaptive aggressiveness of the defrag */
+	/* 计算内存碎片整理所需要占用的主线程资源 */
     int cpu_pct = INTERPOLATE(frag_pct,
             server.active_defrag_threshold_lower,
             server.active_defrag_threshold_upper,
             server.active_defrag_cycle_min,
             server.active_defrag_cycle_max);
+	/* 限制占用资源范围 */
     cpu_pct = LIMIT(cpu_pct,
             server.active_defrag_cycle_min,
             server.active_defrag_cycle_max);
@@ -1060,11 +1063,15 @@ void computeDefragCycles() {
 /* Perform incremental defragmentation work from the serverCron.
  * This works in a similar way to activeExpireCycle, in the sense that
  * we do incremental work across calls. */
+/* 从serverCron执行增量碎片整理工作。
+* 这与activeExpireCycle的工作方式类似，我们在调用之间进行增量工作。 */
 void activeDefragCycle(void) {
     static int current_db = -1;
+	/* 游标，通过迭代scan 整个 redis 节点*/
     static unsigned long cursor = 0;
     static redisDb *db = NULL;
     static long long start_scan, start_stat;
+	/* 迭代计数器 */
     unsigned int iterations = 0;
     unsigned long long prev_defragged = server.stat_active_defrag_hits;
     unsigned long long prev_scanned = server.stat_active_defrag_scanned;
@@ -1092,14 +1099,17 @@ void activeDefragCycle(void) {
 
     /* Once a second, check if the fragmentation justfies starting a scan
      * or making it more aggressive. */
+	/* 每隔一秒，检查碎片情况，决定是否执行*/
     run_with_period(1000) {
         computeDefragCycles();
     }
+	/* 如果没有运行或碎片低于阈值，则不执行 */
     if (!server.active_defrag_running)
         return;
 
     /* See activeExpireCycle for how timelimit is handled. */
     start = ustime();
+	/* 计算每次迭代的时间限制 */
     timelimit = 1000000*server.active_defrag_running/server.hz/100;
     if (timelimit <= 0) timelimit = 1;
     endtime = start + timelimit;
@@ -1121,6 +1131,7 @@ void activeDefragCycle(void) {
 
                 long long now = ustime();
                 size_t frag_bytes;
+				/* 计算碎片率和碎片大小*/
                 float frag_pct = getAllocatorFragmentation(&frag_bytes);
                 serverLog(LL_VERBOSE,
                     "Active defrag done in %dms, reallocated=%d, frag=%.0f%%, frag_bytes=%zu",
@@ -1161,9 +1172,11 @@ void activeDefragCycle(void) {
              * check if we reached the time limit.
              * But regardless, don't start a new db in this loop, this is because after
              * the last db we call defragOtherGlobals, which must be done in one cycle */
+			/* 一旦进入16次扫描迭代，或1000次指针重新分配（如果我们在一个散列桶中有很多指针），检查我们是否达到了tiem限制。*/
             if (!cursor || (++iterations > 16 ||
                             server.stat_active_defrag_hits - prev_defragged > 512 ||
                             server.stat_active_defrag_scanned - prev_scanned > 64)) {
+				/* 如果超时则退出，等待下次获取线程资源后继续执行，*/
                 if (!cursor || ustime() > endtime) {
                     quit = 1;
                     break;
