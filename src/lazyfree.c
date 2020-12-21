@@ -96,8 +96,10 @@ int dbAsyncDelete(redisDb *db, robj *key) {
          * objects, and then call dbDelete(). In this case we'll fall
          * through and reach the dictFreeUnlinkedEntry() call, that will be
          * equivalent to just calling decrRefCount(). */
+        // 如果待删除key的长度超过64字节，异步删除
         if (free_effort > LAZYFREE_THRESHOLD && val->refcount == 1) {
             atomicIncr(lazyfree_objects,1);
+            // 放入BIO队列中由其他进程回收内存空间
             bioCreateBackgroundJob(BIO_LAZY_FREE,val,NULL,NULL);
             dictSetVal(db->dict,de,NULL);
         }
@@ -105,8 +107,9 @@ int dbAsyncDelete(redisDb *db, robj *key) {
 
     /* Release the key-val pair, or just the key if we set the val
      * field to NULL in order to lazy free it later. */
+    // 待删除key长度不超过64字节，依然使用同步删除
     if (de) {
-        dictFreeUnlinkedEntry(db->dict,de);
+        dictFreeUnlinkedEntry(db->dict,de); // 同步回收内存空间
         if (server.cluster_enabled) slotToKeyDel(key->ptr);
         return 1;
     } else {

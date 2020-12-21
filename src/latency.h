@@ -38,26 +38,41 @@
 
 /* Representation of a latency sample: the sampling time and the latency
  * observed in milliseconds. */
+/* 延时样品例子 */
 struct latencySample {
+    //延时Sample创建的时间
     int32_t time; /* We don't use time_t to force 4 bytes usage everywhere. */
+    //延时的具体时间， 单位为毫秒
     uint32_t latency; /* Latency in milliseconds. */
 };
 
 /* The latency time series for a given event. */
+/* 针对某个事件采集的一系列延时sample */
 struct latencyTimeSeries {
+    //下一个延时Sample的下标
     int idx; /* Index of the next sample to store. */
+    //最大的延时
     uint32_t max; /* Max latency observed for this event. */
+    //最近的延时记录
     struct latencySample samples[LATENCY_TS_LEN]; /* Latest history. */
 };
 
 /* Latency statistics structure. */
+/* 延时sample的数据统计结果结构体 */
 struct latencyStats {
+    //绝对最高的延时时间
     uint32_t all_time_high; /* Absolute max observed since latest reset. */
+    //平均Sample延时时间
     uint32_t avg;           /* Average of current samples. */
+    //Sample的最小延时时间
     uint32_t min;           /* Min of current samples. */
+    //Sample的最大延时时间
     uint32_t max;           /* Max of current samples. */
+    //平均相对误差，与平均延时相比
     uint32_t mad;           /* Mean absolute deviation. */
+    //samples的总数
     uint32_t samples;       /* Number of non-zero samples. */
+    //最早的延时记录点的创建时间
     time_t period;          /* Number of seconds since first event and now. */
 };
 
@@ -68,6 +83,7 @@ int THPIsEnabled(void);
 /* Latency monitoring macros. */
 
 /* Start monitoring an event. We just set the current time. */
+/* 对某个事件设置监听，就是设置一下当前的时间 */
 #define latencyStartMonitor(var) if (server.latency_monitor_threshold) { \
     var = mstime(); \
 } else { \
@@ -76,11 +92,13 @@ int THPIsEnabled(void);
 
 /* End monitoring an event, compute the difference with the current time
  * to check the amount of time elapsed. */
+/* 结束监听，算出过了多少时间 */
 #define latencyEndMonitor(var) if (server.latency_monitor_threshold) { \
     var = mstime() - var; \
 }
 
 /* Add the sample only if the elapsed time is >= to the configured threshold. */
+/* 如果延时时间超出server.latency_monitor_threshold，则将Sample加入延时列表中 */
 #define latencyAddSampleIfNeeded(event,var) \
     if (server.latency_monitor_threshold && \
         (var) >= server.latency_monitor_threshold) \

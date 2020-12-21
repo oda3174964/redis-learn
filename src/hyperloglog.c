@@ -180,10 +180,16 @@
  */
 
 struct hllhdr {
+    /* "HYLL" magic number,所有HLL都是一样的 */
     char magic[4];      /* "HYLL" */
     uint8_t encoding;   /* HLL_DENSE or HLL_SPARSE. */
+    /* 全0,没有用处 */
     uint8_t notused[3]; /* Reserved for future use, must be zero. */
+    /* 用于缓存上一次计算的基数，如果两次访问之间该HLL没有改动的话，则直接返回缓存
+       最高位（即card[0]的最高位）为0表示缓存有效，为1表示缓存失效
+    */
     uint8_t card[8];    /* Cached cardinality, little endian. */
+    /* 具体的数据 */
     uint8_t registers[]; /* Data bytes. */
 };
 

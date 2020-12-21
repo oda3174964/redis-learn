@@ -179,10 +179,13 @@ void activeExpireCycle(int type) {
      * time per iteration. Since this function gets called with a frequency of
      * server.hz times per second, the following is the max amount of
      * microseconds we can spend in this function. */
+    // timelimit = 1000000*25/10/100 = 25_000微妙 = 25毫秒
     timelimit = config_cycle_slow_time_perc*1000000/server.hz/100;
     timelimit_exit = 0;
     if (timelimit <= 0) timelimit = 1;
 
+    // 快速扫描回收，扫描回收时间上限为1毫秒
+    // 慢扫描回收，扫描回收时间上限默认timelimit = 25毫秒
     if (type == ACTIVE_EXPIRE_CYCLE_FAST)
         timelimit = config_cycle_fast_duration; /* in microseconds. */
 
@@ -234,6 +237,7 @@ void activeExpireCycle(int type) {
             ttl_sum = 0;
             ttl_samples = 0;
 
+            // 每次从redisDb.expires随机获取20个key
             if (num > config_keys_per_loop)
                 num = config_keys_per_loop;
 
@@ -268,6 +272,7 @@ void activeExpireCycle(int type) {
                         de = de->next;
 
                         ttl = dictGetSignedIntegerVal(e)-now;
+                        // 如果key已过期，默认调用dbAsyncDelete异步删除回收，并累计过期的key数量
                         if (activeExpireCycleTryExpire(db,e,now)) expired++;
                         if (ttl > 0) {
                             /* We want the average TTL of keys yet
@@ -297,6 +302,7 @@ void activeExpireCycle(int type) {
             /* We can't block forever here even if there are many keys to
              * expire. So after a given amount of milliseconds return to the
              * caller waiting for the other active expire cycle. */
+            // 如果过期key的扫描回收时间达到了上限，则结束此次扫描回收操作
             if ((iteration & 0xf) == 0) { /* check once every 16 iterations. */
                 elapsed = ustime()-start;
                 if (elapsed > timelimit) {
@@ -308,7 +314,7 @@ void activeExpireCycle(int type) {
             /* We don't repeat the cycle for the current database if there are
              * an acceptable amount of stale keys (logically expired but yet
              * not reclaimed). */
-        } while (sampled == 0 ||
+        } while (sampled == 0 || // 每次随机获取的20个key如果超过1/4已经过期，则重复操作删除回收过期的key
                  (expired*100/sampled) > config_cycle_acceptable_stale);
     }
 

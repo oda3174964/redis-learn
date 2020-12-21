@@ -1397,6 +1397,7 @@ void setExpire(client *c, redisDb *db, robj *key, long long when) {
     /* Reuse the sds from the main dict in the expire dict */
     kde = dictFind(db->dict,key->ptr);
     serverAssertWithInfo(NULL,key,kde != NULL);
+    // 向hash表db.expires添加key和key的过期时间，用于过期删除key
     de = dictAddOrFind(db->expires,dictGetKey(kde));
     dictSetSignedIntegerVal(de,when);
 
@@ -1519,6 +1520,7 @@ int keyIsExpired(redisDb *db, robj *key) {
  * The return value of the function is 0 if the key is still valid,
  * otherwise the function returns 1 if the key is expired. */
 int expireIfNeeded(redisDb *db, robj *key) {
+    // 查询redisDb.expires判断该key是否过期
     if (!keyIsExpired(db,key)) return 0;
 
     /* If we are running in the context of a slave, instead of
@@ -1529,6 +1531,8 @@ int expireIfNeeded(redisDb *db, robj *key) {
      * Still we try to return the right information to the caller,
      * that is, 0 if we think the key should be still valid, 1 if
      * we think the key is expired at this time. */
+    // 从节点不处理过期机制，等待主节点的指令直接删除对应的key
+    // 因此存在网络延迟大时，已过期的key能在从节点查询出来的问题
     if (server.masterhost != NULL) return 1;
 
     /* Delete the key */
@@ -1538,6 +1542,7 @@ int expireIfNeeded(redisDb *db, robj *key) {
     //发送"expired"事件通知
     notifyKeyspaceEvent(NOTIFY_EXPIRED,
         "expired",key,db->id);
+    // 默认使用dbAsyncDelete异步删除回收
     int retval = server.lazyfree_lazy_expire ? dbAsyncDelete(db,key) :
                                                dbSyncDelete(db,key);
     //从数据库中删除key

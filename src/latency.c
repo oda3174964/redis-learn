@@ -95,7 +95,9 @@ void latencyMonitorInit(void) {
  * This function is usually called via latencyAddSampleIfNeeded(), that
  * is a macro that only adds the sample if the latency is higher than
  * server.latency_monitor_threshold. */
+/* 添加Sample到指定的Event对象的Sample列表中 */
 void latencyAddSample(const char *event, mstime_t latency) {
+    //找出Event对应的延时Sample记录结构体
     struct latencyTimeSeries *ts = dictFetchValue(server.latency_events,event);
     time_t now = time(NULL);
     int prev;
@@ -106,6 +108,7 @@ void latencyAddSample(const char *event, mstime_t latency) {
         ts->idx = 0;
         ts->max = 0;
         memset(ts->samples,0,sizeof(ts->samples));
+        //如果ts为空，重新添加，一个Event，对应一个latencyTimeSeries
         dictAdd(server.latency_events,zstrdup(event),ts);
     }
 
@@ -120,6 +123,7 @@ void latencyAddSample(const char *event, mstime_t latency) {
         return;
     }
 
+    //为Sample赋值
     ts->samples[ts->idx].time = time(NULL);
     ts->samples[ts->idx].latency = latency;
 
@@ -157,11 +161,13 @@ int latencyResetEvent(char *event_to_reset) {
  * Check latency.h definition of struct latencyStats for more info.
  * If the specified event has no elements the structure is populate with
  * zero values. */
+/* 分析某个时间Event的延时结果，结果信息存入latencyStats结构体中 */
 void analyzeLatencyForEvent(char *event, struct latencyStats *ls) {
     struct latencyTimeSeries *ts = dictFetchValue(server.latency_events,event);
     int j;
     uint64_t sum;
 
+    //初始化延时统计结果结构体的变量
     ls->all_time_high = ts ? ts->max : 0;
     ls->avg = 0;
     ls->min = 0;
@@ -179,6 +185,7 @@ void analyzeLatencyForEvent(char *event, struct latencyStats *ls) {
         if (ls->samples == 1) {
             ls->min = ls->max = ts->samples[j].latency;
         } else {
+            //找出延时最大和最小的延时时间
             if (ls->min > ts->samples[j].latency)
                 ls->min = ts->samples[j].latency;
             if (ls->max < ts->samples[j].latency)
@@ -188,7 +195,7 @@ void analyzeLatencyForEvent(char *event, struct latencyStats *ls) {
 
         /* Track the oldest event time in ls->period. */
         if (ls->period == 0 || ts->samples[j].time < ls->period)
-            ls->period = ts->samples[j].time;
+            ls->period = ts->samples[j].time; //最早的延时记录点的创建时间
     }
 
     /* So far avg is actually the sum of the latencies, and period is
@@ -201,6 +208,7 @@ void analyzeLatencyForEvent(char *event, struct latencyStats *ls) {
     }
 
     /* Second pass, compute MAD. */
+    //计算平均相对误差，与平均延时相比
     sum = 0;
     for (j = 0; j < LATENCY_TS_LEN; j++) {
         int64_t delta;
@@ -514,6 +522,7 @@ void latencyCommandReplyWithLatestEvents(client *c) {
 }
 
 #define LATENCY_GRAPH_COLS 80
+/* 利用延时的Sample点，画出对应的微线图 */
 sds latencyCommandGenSparkeline(char *event, struct latencyTimeSeries *ts) {
     int j;
     struct sequence *seq = createSparklineSequence();
@@ -553,8 +562,10 @@ sds latencyCommandGenSparkeline(char *event, struct latencyTimeSeries *ts) {
     for (j = 0; j < LATENCY_GRAPH_COLS; j++)
         graph = sdscatlen(graph,"-",1);
     graph = sdscatlen(graph,"\n",1);
+    //调用sparkline函数画微线图
     graph = sparklineRender(graph,seq,LATENCY_GRAPH_COLS,4,SPARKLINE_FILL);
     freeSparklineSequence(seq);
+     //返回微线图字符串
     return graph;
 }
 
