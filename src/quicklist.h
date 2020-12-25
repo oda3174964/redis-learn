@@ -148,20 +148,20 @@ typedef struct quicklistEntry {
     int offset;//保存相对ziplist的偏移量
 } quicklistEntry;
 
-#define QUICKLIST_HEAD 0 //没有被压缩
-#define QUICKLIST_TAIL -1 //被LZF算法压缩
+#define QUICKLIST_HEAD 0
+#define QUICKLIST_TAIL -1
 
 /* quicklist node encodings */
-#define QUICKLIST_NODE_ENCODING_RAW 1 //quicklist节点直接保存对象
-#define QUICKLIST_NODE_ENCODING_LZF 2 //quicklist节点采用ziplist保存对象
+#define QUICKLIST_NODE_ENCODING_RAW 1 //没有被压缩
+#define QUICKLIST_NODE_ENCODING_LZF 2 //被LZF算法压缩
 
 /* quicklist compression disable */
 //测试quicklist节点是否被压缩，返回1 表示被压缩，否则返回0
 #define QUICKLIST_NOCOMPRESS 0
 
 /* quicklist container formats */
-#define QUICKLIST_NODE_CONTAINER_NONE 1
-#define QUICKLIST_NODE_CONTAINER_ZIPLIST 2
+#define QUICKLIST_NODE_CONTAINER_NONE 1  //quicklist节点直接保存对象
+#define QUICKLIST_NODE_CONTAINER_ZIPLIST 2 //quicklist节点采用ziplist保存对象
 
 #define quicklistNodeIsCompressed(node)                                        \
     ((node)->encoding == QUICKLIST_NODE_ENCODING_LZF)
